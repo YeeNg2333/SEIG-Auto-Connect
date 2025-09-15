@@ -1485,8 +1485,10 @@ if __name__ == "__main__":
             QtWidgets.QApplication.setAttribute(
                 QtCore.Qt.AA_UseHighDpiPixmaps, True)
         app = QtWidgets.QApplication(sys.argv)
+        # mainWindow = MainWindow()
+        # mainWindow.show()
         
-        # 创建启动画面
+        # 创建启动画面(Cursor Agent生成)
         splash = create_splash_screen()
         splash.show()
         app.processEvents()  # 确保启动画面立即显示
