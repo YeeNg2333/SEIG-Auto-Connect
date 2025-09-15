@@ -58,6 +58,141 @@ rsa_public_key = """
     -----END PUBLIC KEY-----
     """
 
+# 由Cursor Agent生成
+class SplashScreen(QtWidgets.QSplashScreen):
+    """启动画面类"""
+    def __init__(self):
+        # 创建启动画面图片（如果没有图片，使用纯色背景）
+        pixmap = self.create_splash_pixmap()
+        super().__init__(pixmap)
+        
+        # 设置窗口属性
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | 
+                           QtCore.Qt.FramelessWindowHint)
+        
+        # 设置透明度（可选）
+        self.setWindowOpacity(0.95)
+        
+        # 显示初始消息
+        self.showMessage("正在启动 SEIG 虚空终端...", 
+                        QtCore.Qt.AlignBottom | QtCore.Qt.AlignCenter,
+                        QtGui.QColor(255, 255, 255))
+        
+        # 启动进度更新定时器
+        self.progress = 0
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_progress)
+        self.timer.start(50)  # 每50ms更新一次
+    
+    def create_splash_pixmap(self):
+        """创建启动画面图片"""
+        # 优先尝试加载专门的启动画面图片
+        if os.path.exists('splash.png'):
+            try:
+                pixmap = QtGui.QPixmap('splash.png')
+                if not pixmap.isNull():
+                    return pixmap
+            except:
+                pass
+        
+        # 尝试加载图标文件
+        if os.path.exists('yish.ico'):
+            try:
+                pixmap = QtGui.QPixmap('yish.ico')
+                if not pixmap.isNull():
+                    # 缩放到合适大小
+                    return pixmap.scaled(400, 300, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+            except:
+                pass
+        
+        # 如果没有图片，创建纯色背景
+        pixmap = QtGui.QPixmap(400, 300)
+        pixmap.fill(QtGui.QColor(45, 45, 45))  # 深灰色背景
+        
+        # 添加文字
+        painter = QtGui.QPainter(pixmap)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        # 设置字体
+        font = QtGui.QFont()
+        font.setPointSize(16)
+        font.setBold(True)
+        painter.setFont(font)
+        
+        # 绘制标题
+        painter.setPen(QtGui.QColor(255, 255, 255))
+        painter.drawText(pixmap.rect(), QtCore.Qt.AlignCenter, 
+                        f"SEIG 虚空终端 v{version}")
+        
+        # 绘制版本信息
+        font.setPointSize(10)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor(200, 200, 200))
+        painter.drawText(pixmap.rect().adjusted(0, 50, 0, 0), QtCore.Qt.AlignCenter,
+                        "正在初始化程序...")
+        
+        painter.end()
+        return pixmap
+    
+    def update_progress(self):
+        """更新进度"""
+        self.progress += 2
+        if self.progress >= 100:
+            self.timer.stop()
+            self.showMessage("启动完成！", 
+                           QtCore.Qt.AlignBottom | QtCore.Qt.AlignCenter,
+                           QtGui.QColor(0, 255, 0))
+        else:
+            # 根据进度显示不同消息
+            if self.progress < 30:
+                message = "正在加载核心模块..."
+            elif self.progress < 60:
+                message = "正在初始化界面..."
+            elif self.progress < 90:
+                message = "正在连接网络..."
+            else:
+                message = "即将完成启动..."
+            
+            self.showMessage(message, 
+                           QtCore.Qt.AlignBottom | QtCore.Qt.AlignCenter,
+                           QtGui.QColor(255, 255, 255))
+    
+    def close_splash(self):
+        """关闭启动画面"""
+        self.timer.stop()
+        self.close()
+
+
+def create_splash_screen():
+    """创建启动画面"""
+    return SplashScreen()
+
+
+def create_main_window(splash):
+    """创建主窗口并关闭启动画面"""
+    global mainWindow
+    
+    try:
+        # 创建主窗口
+        mainWindow = MainWindow()
+        
+        # 延迟关闭启动画面，确保主窗口完全加载
+        QtCore.QTimer.singleShot(500, lambda: splash.close_splash())
+        
+        # 显示主窗口
+        mainWindow.show()
+        
+        # 确保主窗口获得焦点
+        mainWindow.activateWindow()
+        mainWindow.raise_()
+        
+    except Exception as e:
+        # 如果创建主窗口失败，关闭启动画面并显示错误
+        splash.close_splash()
+        user32 = ctypes.windll.user32
+        user32.MessageBoxW(None, f"创建主窗口时遇到错误: {e}", "错误!", 0x30)
+        sys.exit(1)
+
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def setupUi(self, MainWindow):
@@ -1350,8 +1485,15 @@ if __name__ == "__main__":
             QtWidgets.QApplication.setAttribute(
                 QtCore.Qt.AA_UseHighDpiPixmaps, True)
         app = QtWidgets.QApplication(sys.argv)
-        mainWindow = MainWindow()
-        mainWindow.show()
+        
+        # 创建启动画面
+        splash = create_splash_screen()
+        splash.show()
+        app.processEvents()  # 确保启动画面立即显示
+        
+        # 延迟创建主窗口，让启动画面有时间显示
+        QtCore.QTimer.singleShot(100, lambda: create_main_window(splash))
+        
         sys.exit(app.exec_())
     except Exception as e:
         user32 = ctypes.windll.user32
